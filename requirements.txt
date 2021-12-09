@@ -1,0 +1,12 @@
+attrs==21.2.0
+bidict==0.21.4
+funcy==1.16
+parsimonious==0.8.1
+py-aiger==6.1.20
+py-aiger-cnf==5.0.4
+pypblib==0.0.4
+pyrsistent==0.18.0
+python-sat==0.1.7.dev15
+six==1.16.0
+sortedcontainers==2.4.0
+toposort==1.7
