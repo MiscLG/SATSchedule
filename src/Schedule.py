@@ -1,5 +1,6 @@
 import os
 import datetime
+import itertools
 from pysat.formula import CNF
 from pysat.solvers import MinisatGH
 
@@ -60,15 +61,6 @@ class Job():
 
 class Schedule():
     """
-        TODO:Model Schedule as a graph, for simple SAT translation
-        pay_period = [] list of workdays
-        jobs = []   list of jobs
-        teams = []  teams assigned in this pay period
-        assignments = {} dict mapping jobs to teams and days
-        var_dict= {} map of cnf object to its corresponding digit in the formula
-        SAT_fomula = CNF()
-
-
     Variables:
      Teams: T_i {true: if team is working, false: otherwise }
      Jobs: J_ij {true if team is assigned to job j, false: otherwise}
@@ -77,6 +69,10 @@ class Schedule():
     Jobs must be assigned to exactly 1 team, Jobs take at most one full workday:
     Jobs in the same day must be completed in the duration of the including travel time workday.
     REACH -Teams cannot be assigned more than 2 jobs more than the rest at any point in the pay period.
+
+    # day must be assigned to one job
+    D111 or D112 -> J11
+
     """
     class CNF_Var:
         """
@@ -129,6 +125,7 @@ class Schedule():
     def make_inner_vars(self, i, j):
         J_ij = self.add_var("J", {"job": j, "team": i})
         self.unmap_team(i).sublist.append(J_ij)
+        # TODO: This job may not be matching name on cnf_var
         for k, day in enumerate(self.pay_period):
             D_ijk = self.add_var("D", {"day": k, "job": j, "team": i})
             self.unmap_job(i, j).sublist.append(D_ijk)
@@ -153,32 +150,50 @@ class Schedule():
         # assumes mapping is correct and complete
         # this assumes one job per day
         clauses = []
+        print(len(self.teams))
+        print(len(self.jobs))
+        print(len(self.pay_period))
         for team in self.cnf_map:
             # having this team implies variables containing these teams
             T_i = self.cnf_vars[team-1]
             i = T_i.cnf_ix
             team_per_job = [-i]
-            for job in T_i.sublist:
+            jobs = T_i.sublist
+            j_vars = []
+            for j_ix, j in enumerate(jobs):
                 # print(job)
-                J_ij = self.cnf_vars[job-1]
-                j = J_ij.cnf_ix
+                J_ij = self.cnf_vars[j-1]
+                # every job must be completed
+                clauses.append([j])
                 job_per_team = [-j, i]
+                # this job assignment implies certain team is working
                 clauses.append(job_per_team)
+                # this job implies certain assignments are satisfiable
                 day_per_job = [-j]
                 team_per_job.append(j)
-                for day in J_ij.sublist:
-                    # do [-D_ij, J_ij][-D_ij,J_ij] one clause per job
-                    # having this day implies no other job has this day
+                day_assn = []
+                days = J_ij.sublist
+                print(days)
+                # job cannot be assigned to two days
+                clauses.extend([-x, -y] for ix, x in enumerate(days)
+                               for y in days[ix+1:])
+                j_vars.append(days)
+                for k in days:
+                    # two jobs cannot have same day ijk [-i11, -i21]
                     # TODO: make this account for multiple jobs in a day
-                    D_ijk = self.cnf_vars[day-1]
-                    k = D_ijk.cnf_ix
+
+                    # this job assignment implies certain job_team pairing is met
                     job_per_day = [-k, j]
                     clauses.append(job_per_day)
-                    # also
-                    # do [-JT_ij,DJT_ij,DJT_ij] one item in clause per job
-                    # having this job implies no other day has this job
                     day_per_job.append(k)
                 clauses.append(day_per_job)
+            # jobs cannot happen on the same day
+            # TODO: optimize this calculation by working on transpose of cnf_map
+            j_vars = [[j_vars[j][i]
+                       for j in range(len(j_vars))] for i in range(len(j_vars[0]))]
+            for row in j_vars:
+                clauses.extend([-x, -y] for ix, x in enumerate(row)
+                               for y in row[ix+1:])
             clauses.append(team_per_job)
 
         self.SAT_formula = clauses
@@ -197,28 +212,30 @@ class Schedule():
         if None:
             return "Unsatisfiable"
         res_obj = {}
+        assignments = []
         for ix in result:
             val = ix > 0
             var = self.cnf_vars[abs(ix)-1]
-            # if var.category == "T":
-            #     key = self.teams[var.mapping["team"]].name
-            #     res_obj[key] = var.mapping
-            # elif var.category == "J":
-            #     key = self.jobs[var.mapping["team"]].address
-            #     res_obj[key] = var.mapping
-            # else:
+
             if var.category == "D":
-                key = ix
                 job = self.jobs[var.mapping["job"]].address
                 team = self.teams[var.mapping["team"]].name
                 day = var.mapping["day"]
-                res_obj[key] = {
+                res_obj[ix] = {
                     "job": job,
                     "team": team,
                     "day": day,
                 }
+                if val:
+                    assignments.append(res_obj[ix])
+            elif var.category == "T":
+                res_obj[ix] = self.teams[var.mapping["team"]].name
+            elif var.category == "J":
+                job = self.jobs[var.mapping["job"]].address
+                team = self.teams[var.mapping["team"]].name
+                res_obj[ix] = {"job": job, "team": team}
 
-        return res_obj
+        return res_obj, assignments
 
 
 if __name__ == "__main__":
@@ -226,12 +243,14 @@ if __name__ == "__main__":
     formula = CNF()
     formula.append([-1, 2])
 
-    test = Schedule(period_length=1)
+    test = Schedule(period_length=2)
     team1 = Team("A", [Employee("Luis"), Employee("Leo")])
     team2 = Team("B", [Employee("Eva"), Employee("Mar")])
     test.add_team(team1)
     # test.add_team(team2)
     test.add_job(Job(3, "1 LMU Drive"))
     test.add_job(Job(3, "1062 Durness"))
-
-    print(test.resolve())
+    # test.add_job(Job(2, "Hello"))
+    res = test.resolve()
+    print(res[0])
+    print(res[1])
