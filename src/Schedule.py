@@ -44,12 +44,12 @@ class WorkDay():
 
 
 class Job():
-    length_sec = 0
+    length_hr = 0
     date = None
     team = None
 
     def __init__(self, length_hr, address):
-        self.length_sec = length_hr
+        self.length_hr = length_hr
         self.address = address
 
     def set_date(self, date):
@@ -57,8 +57,11 @@ class Job():
 
     def distance(self, job):
         distance_mi = 8
-        time_min = 30
-        return distance_mi, time_min
+        time_hr = 0.25
+        return distance_mi, time_hr
+
+    def total_time(self, job):
+        return self.length_hr + job.length_hr + self.distance(job)[1]
 
 
 class Schedule():
@@ -148,13 +151,23 @@ class Schedule():
         for j, job in enumerate(self.jobs):
             self.make_inner_vars(i, j)
 
+    def jobs_overlap(self, d1_ix, d2_ix):
+        d1 = self.cnf_vars[d1_ix-1].mapping
+        d2 = self.cnf_vars[d2_ix-1].mapping
+        if d1["team"] != d2["team"]:
+            return True
+        if d1["job"] == d2["job"]:
+            return True
+        if d1["day"] != d2["day"]:
+            return True
+        if self.jobs[d1["job"]].total_time(self.jobs[d2["job"]]) <= self.pay_period[d1["day"]].length_hr:
+            return False
+        return True
+
     def encode_full_cnf(self):
         # assumes mapping is correct and complete
         # this assumes one job per day
         clauses = []
-        print(len(self.teams))
-        print(len(self.jobs))
-        print(len(self.pay_period))
         i_vars = []
         j_vars = [[] for i in range(len(self.jobs))]
         team_jobs = [[] for _ in range(len(self.jobs))]
@@ -197,9 +210,12 @@ class Schedule():
             flat_grp = sum(team_group, [])  # same team
             for rem_team in i_vars[ix+1:]:
                 # multiple teams do not do the same job on the same day
-                c = [[-job, -sum(rem_team, [])[job_ix]]
+                rem = sum(rem_team, [])
+                c = [[-job, -rem[job_ix]]
                      for job_ix, job in enumerate(flat_grp)]
                 # print("c", c)
+                # remove constraint if jobs can be in the same day
+
                 clauses.extend(c)
 
         for ix, job_group in enumerate(j_vars):
@@ -209,13 +225,13 @@ class Schedule():
                  for y in flat_grp[ix+1:]]
             # print("c", c)
             clauses.extend(c)
-
             for rem_job in j_vars[ix+1:]:
                 # jobs is done after one team works on it for one day
                 # same team does not do multiple jobs on the same day
-                c = [[-team, -sum(rem_job, [])[team_ix]]
-                     for team_ix, team in enumerate(flat_grp)]
-                # print("c", c)
+                rem = sum(rem_job, [])
+                c = [[-team, -rem[team_ix]]
+                     for team_ix, team in enumerate(flat_grp) if self.jobs_overlap(team, rem[team_ix])]
+                print("c", c)
                 clauses.extend(c)
 
         self.SAT_formula = clauses
@@ -263,13 +279,13 @@ if __name__ == "__main__":
     formula = CNF()
     formula.append([-1, 2])
 
-    test = Schedule(period_length=5)
+    test = Schedule(period_length=1)
     test.add_team(Team("A", [Employee("Luis"), Employee("Leo")]))
-    # test.add_team(Team("B", [Employee("Eva"), Employee("Mar")]))
+    test.add_team(Team("B", [Employee("Eva"), Employee("Mar")]))
     # test.add_team(Team("C", [Employee("Teca")]))
     test.add_job(Job(3, "1 LMU Drive"))
-    test.add_job(Job(3, "1062 Durness"))
-    test.add_job(Job(2, "Hello"))
+    test.add_job(Job(5, "1062 Durness"))
+    # test.add_job(Job(2, "Hello"))
     # test.add_job(Job(2, "Hello"))
     # test.add_job(Job(2, "Hello"))
     # test.add_job(Job(2, "Hello"))
