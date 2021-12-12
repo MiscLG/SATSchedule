@@ -66,6 +66,8 @@ class Job():
 
 class Schedule():
     """
+    TODO: clean up this description
+    TODO: attempt to add constraints to balance employee assignments
     Variables:
      Teams: T_i {true: if team is working, false: otherwise }
      Jobs: J_ij {true if team is assigned to job j, false: otherwise}
@@ -130,7 +132,6 @@ class Schedule():
     def make_inner_vars(self, i, j):
         J_ij = self.add_var("J", {"job": j, "team": i})
         self.unmap_team(i).sublist.append(J_ij)
-        # TODO: This job may not be matching name on cnf_var
         for k, day in enumerate(self.pay_period):
             D_ijk = self.add_var("D", {"day": k, "job": j, "team": i})
             self.unmap_job(i, j).sublist.append(D_ijk)
@@ -165,6 +166,7 @@ class Schedule():
         return True
 
     def encode_full_cnf(self):
+        # TODO: clean up this monster
         # assumes mapping is correct and complete
         # this assumes one job per day
         clauses = []
@@ -201,6 +203,7 @@ class Schedule():
 
             clauses.append(team_per_job)
             i_vars.append(team_days)
+        print(team_jobs)
         clauses.extend(team_jobs)
         print("byTeam")
         print(i_vars)
