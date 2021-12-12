@@ -1,8 +1,10 @@
 import os
 import datetime
+import pprint
 import itertools
 from pysat.formula import CNF
 from pysat.solvers import MinisatGH
+from pprint import pprint
 
 loc = os.path.dirname(os.path.realpath(__file__))
 
@@ -153,18 +155,20 @@ class Schedule():
         print(len(self.teams))
         print(len(self.jobs))
         print(len(self.pay_period))
-        for team in self.cnf_map:
+        i_vars = []
+        j_vars = [[] for i in range(len(self.jobs))]
+        team_jobs = [[] for _ in range(len(self.jobs))]
+        for i_ix, team in enumerate(self.cnf_map):
+            team_days = []
             # having this team implies variables containing these teams
             T_i = self.cnf_vars[team-1]
             i = T_i.cnf_ix
+            # this team implies certain jobs are satisfiable
             team_per_job = [-i]
             jobs = T_i.sublist
-            j_vars = []
             for j_ix, j in enumerate(jobs):
-                # print(job)
+                team_jobs[j_ix].append(j)
                 J_ij = self.cnf_vars[j-1]
-                # every job must be completed
-                clauses.append([j])
                 job_per_team = [-j, i]
                 # this job assignment implies certain team is working
                 clauses.append(job_per_team)
@@ -173,35 +177,51 @@ class Schedule():
                 team_per_job.append(j)
                 day_assn = []
                 days = J_ij.sublist
-                print(days)
-                # job cannot be assigned to two days
-                clauses.extend([-x, -y] for ix, x in enumerate(days)
-                               for y in days[ix+1:])
-                j_vars.append(days)
+                team_days.append(days)
+                j_vars[j_ix].append(days)
                 for k in days:
-                    # two jobs cannot have same day ijk [-i11, -i21]
-                    # TODO: make this account for multiple jobs in a day
-
                     # this job assignment implies certain job_team pairing is met
                     job_per_day = [-k, j]
                     clauses.append(job_per_day)
                     day_per_job.append(k)
                 clauses.append(day_per_job)
-            # jobs cannot happen on the same day
-            # TODO: optimize this calculation by working on transpose of cnf_map
-            j_vars = [[j_vars[j][i]
-                       for j in range(len(j_vars))] for i in range(len(j_vars[0]))]
-            for row in j_vars:
-                clauses.extend([-x, -y] for ix, x in enumerate(row)
-                               for y in row[ix+1:])
+
             clauses.append(team_per_job)
+            i_vars.append(team_days)
+        clauses.extend(team_jobs)
+        print("byTeam")
+        print(i_vars)
+        print("byJob")
+        print(j_vars)
+        for ix, team_group in enumerate(i_vars):
+            flat_grp = sum(team_group, [])  # same team
+            for rem_team in i_vars[ix+1:]:
+                # multiple teams do not do the same job on the same day
+                c = [[-job, -sum(rem_team, [])[job_ix]]
+                     for job_ix, job in enumerate(flat_grp)]
+                # print("c", c)
+                clauses.extend(c)
+
+        for ix, job_group in enumerate(j_vars):
+            # jobs cannot happen on the same day
+            flat_grp = sum(job_group, [])  # same address
+            c = [[-x, -y] for ix, x in enumerate(flat_grp)
+                 for y in flat_grp[ix+1:]]
+            # print("c", c)
+            clauses.extend(c)
+
+            for rem_job in j_vars[ix+1:]:
+                # jobs is done after one team works on it for one day
+                # same team does not do multiple jobs on the same day
+                c = [[-team, -sum(rem_job, [])[team_ix]]
+                     for team_ix, team in enumerate(flat_grp)]
+                # print("c", c)
+                clauses.extend(c)
 
         self.SAT_formula = clauses
 
     def resolve(self):
         self.encode_full_cnf()
-        print(self.SAT_formula)
-        print([var.cnf_ix for var in self.cnf_vars])
         g = MinisatGH(bootstrap_with=self.SAT_formula)
         print(g.solve())
         res = g.get_model()
@@ -209,10 +229,10 @@ class Schedule():
         return self.humanize(res)
 
     def humanize(self, result):
-        if None:
-            return "Unsatisfiable"
+        if not result:
+            return "Unsatisfiable", None
         res_obj = {}
-        assignments = []
+        assignments = {}
         for ix in result:
             val = ix > 0
             var = self.cnf_vars[abs(ix)-1]
@@ -227,7 +247,7 @@ class Schedule():
                     "day": day,
                 }
                 if val:
-                    assignments.append(res_obj[ix])
+                    assignments[ix] = res_obj[ix]
             elif var.category == "T":
                 res_obj[ix] = self.teams[var.mapping["team"]].name
             elif var.category == "J":
@@ -243,14 +263,19 @@ if __name__ == "__main__":
     formula = CNF()
     formula.append([-1, 2])
 
-    test = Schedule(period_length=2)
-    team1 = Team("A", [Employee("Luis"), Employee("Leo")])
-    team2 = Team("B", [Employee("Eva"), Employee("Mar")])
-    test.add_team(team1)
-    # test.add_team(team2)
+    test = Schedule(period_length=5)
+    test.add_team(Team("A", [Employee("Luis"), Employee("Leo")]))
+    # test.add_team(Team("B", [Employee("Eva"), Employee("Mar")]))
+    # test.add_team(Team("C", [Employee("Teca")]))
     test.add_job(Job(3, "1 LMU Drive"))
     test.add_job(Job(3, "1062 Durness"))
+    test.add_job(Job(2, "Hello"))
+    # test.add_job(Job(2, "Hello"))
+    # test.add_job(Job(2, "Hello"))
     # test.add_job(Job(2, "Hello"))
     res = test.resolve()
-    print(res[0])
-    print(res[1])
+
+    pprint(test.humanize([x.cnf_ix for x in test.cnf_vars])[0])
+    print(test.SAT_formula)
+    # pprint(res[0])
+    pprint(res[1])
