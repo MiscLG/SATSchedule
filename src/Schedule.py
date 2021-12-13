@@ -66,20 +66,10 @@ class Job():
 
 class Schedule():
     """
-    TODO: clean up this description
-    TODO: attempt to add constraints to balance employee assignments
     Variables:
      Teams: T_i {true: if team is working, false: otherwise }
      Jobs: J_ij {true if team is assigned to job j, false: otherwise}
      Days: D_ijk {true: if team is assigned a job j on day k, false: otherwise}
-    Constraints:
-    Jobs must be assigned to exactly 1 team, Jobs take at most one full workday:
-    Jobs in the same day must be completed in the duration of the including travel time workday.
-    REACH -Teams cannot be assigned more than 2 jobs more than the rest at any point in the pay period.
-
-    # day must be assigned to one job
-    D111 or D112 -> J11
-
     """
     class CNF_Var:
         """
@@ -167,6 +157,8 @@ class Schedule():
 
     def encode_full_cnf(self):
         # TODO: clean up this monster
+        # TODO: add [-J_ijk, -J_ijk] if the combination of i's has the same employees.
+        # Assumes teams can have overlapping members
         # assumes mapping is correct and complete
         # this assumes one job per day
         clauses = []
