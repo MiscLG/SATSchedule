@@ -40,3 +40,17 @@ Supporting Constraints:
 - Assignment of J_ik means [-J_ij, t_i] for each T_i. If a Job is a assigned a team, then the variable that contains that team must be true.
 
 Each of these constraints is encoded into corresponding cnf_clauses and then that clause is processed by Minisat using the pysat library. This library gives me a solution as a list of variables that are set to either true or false. Since this is not a human readable answer, I take the workday variables D_ijk that are true and show the relevant data for the team, job and day that the jobs are assigned. Displaying this data I can obtain the assignment I need for the pay_period, although finer details about specific times, order of execution within a day and how much workers are getting payed in each job is left out to be calculated at a later time. Although those items may be doable with SAT, covering those bases may be useful for optimization, but for now, this project deals solely with obtaining assignments that work within business requirements.
+
+### Formally
+
+We can prove this scheduling problem is NP complete:
+
+- The problem is in NP.
+  > An assignment can be checked in polynomial time. Checking will mean making sure assignments are not overlapping by day, team, and job. We can make this comparison by hashing the assignments by their identifiers and checking for collisions when adding to a hashmap.
+- The problem is NP-Hard.
+
+  > We can Reduce this problem to SAT in polynomial time. Using the above CNF encoding rules. With t being the number of teams, j being the number of jobs and d being the number of workdays. The number of variables v = t+tj + tjd. The number of clauses created is a function of t, j, and d. If we consider n to be the maximum between t,j and d then the overall complexity of this step end up being some O(n^2). This encoding can then be solved as a Boolean Satisfiability problem.
+
+  Therefore this scheduling problem is NP complete.
+
+  If we wanted to create an optimization algorithm for this process, it would be NP-Hard because checking the optimal solution would require us to calculate the optimal solution. And to solve the problem we would have to solve SAT some number of times.
