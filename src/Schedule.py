@@ -195,12 +195,12 @@ class Schedule():
 
             clauses.append(team_per_job)
             i_vars.append(team_days)
-        print(team_jobs)
+        # print(team_jobs)
         clauses.extend(team_jobs)
-        print("byTeam")
-        print(i_vars)
-        print("byJob")
-        print(j_vars)
+        # print("byTeam")
+        # print(i_vars)
+        # print("byJob")
+        # print(j_vars)
         for ix, team_group in enumerate(i_vars):
             flat_grp = sum(team_group, [])  # same team
             for rem_team in i_vars[ix+1:]:
@@ -232,6 +232,9 @@ class Schedule():
         self.SAT_formula = clauses
 
     def resolve(self):
+        if(len(self.teams) == 0 or len(self.jobs) == 0):
+            print("not enough variables to decide")
+            return False, None
         self.encode_full_cnf()
         g = MinisatGH(bootstrap_with=self.SAT_formula)
         print(g.solve())
@@ -271,22 +274,69 @@ class Schedule():
 
 if __name__ == "__main__":
     print("SAT Schedule")
-    formula = CNF()
-    formula.append([-1, 2])
+    # formula = CNF()
+    # formula.append([-1, 2])
 
-    test = Schedule(period_length=1)
-    test.add_team(Team("A", [Employee("Luis"), Employee("Leo")]))
-    test.add_team(Team("B", [Employee("Eva"), Employee("Mar")]))
-    # test.add_team(Team("C", [Employee("Teca")]))
-    test.add_job(Job(3, "1 LMU Drive"))
-    test.add_job(Job(5, "1062 Durness"))
-    # test.add_job(Job(2, "Hello"))
-    # test.add_job(Job(2, "Hello"))
-    # test.add_job(Job(2, "Hello"))
-    # test.add_job(Job(2, "Hello"))
-    res = test.resolve()
+    # test = Schedule(period_length=1)
+    # test.add_team(Team("A", [Employee("Luis"), Employee("Leo")]))
+    # test.add_team(Team("B", [Employee("Eva"), Employee("Mar")]))
+    # # test.add_team(Team("C", [Employee("Teca")]))
+    # test.add_job(Job(3, "1 LMU Drive"))
+    # test.add_job(Job(5, "1062 Durness"))
+    # # test.add_job(Job(2, "Hello"))
+    # # test.add_job(Job(2, "Hello"))
+    # # test.add_job(Job(2, "Hello"))
+    # # test.add_job(Job(2, "Hello"))
+    # res = test.resolve()
 
-    pprint(test.humanize([x.cnf_ix for x in test.cnf_vars])[0])
-    print(test.SAT_formula)
-    # pprint(res[0])
-    pprint(res[1])
+    # pprint(test.humanize([x.cnf_ix for x in test.cnf_vars])[0])
+    # print(test.SAT_formula)
+    # # pprint(res[0])
+    # pprint(res[1])
+
+    proceed = True
+
+    length = int(input("How many days are in your schedule?\t"))
+    sched = Schedule(period_length=length)
+
+    def cmd_add_team():
+        team = None
+        team_name = str(input("What is the team name?\t"))
+        employee_names = str(
+            input("Input comma separated names of employees in the team. \t"))
+        employees = [Employee(name) for name in employee_names.split(',')]
+        team = Team(team_name, employees)
+        return team
+
+    def cmd_add_job():
+        job = None
+        print("For testing purposes the jobs will default to travel length of one quarter of an hour.\n")
+        job_name = str(input("What is the job address?\t"))
+        job_length = int(
+            input("How long will it take to complete this job?\t"))
+        job = Job(job_length, job_name)
+        return job
+    resolve = False
+    while proceed:
+        choice = int(input("pick one: 1) add team 2) add job 3) quit \t"))
+        if choice == 1:
+            team = cmd_add_team()
+            if not team:
+                continue
+            sched.add_team(team)
+            resolve = True
+        if choice == 2:
+            job = cmd_add_job()
+            if not job:
+                continue
+            sched.add_job(job)
+            resolve = True
+        if choice == 3:
+            if resolve:
+                print(sched.resolve()[1])
+            else:
+                print("No schedule was made")
+            proceed = False
+
+        else:
+            continue
