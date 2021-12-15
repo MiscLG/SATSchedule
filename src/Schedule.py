@@ -226,7 +226,7 @@ class Schedule():
                 rem = sum(rem_job, [])
                 c = [[-team, -rem[team_ix]]
                      for team_ix, team in enumerate(flat_grp) if self.jobs_overlap(team, rem[team_ix])]
-                print("c", c)
+                # print("c", c)
                 clauses.extend(c)
 
         self.SAT_formula = clauses
@@ -318,7 +318,8 @@ if __name__ == "__main__":
         return job
     resolve = False
     while proceed:
-        choice = int(input("pick one: 1) add team 2) add job 3) quit \t"))
+        choice = int(
+            input("pick one: 1) add team 2) add job 3) resolve 4) quit \t"))
         if choice == 1:
             team = cmd_add_team()
             if not team:
@@ -336,7 +337,7 @@ if __name__ == "__main__":
                 print(sched.resolve()[1])
             else:
                 print("No schedule was made")
+        if choice == 4:
             proceed = False
-
         else:
             continue
